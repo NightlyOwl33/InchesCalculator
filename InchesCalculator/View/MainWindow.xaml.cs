@@ -19,6 +19,7 @@ namespace InchesCalculator
     /// <summary>
     /// Interaction logic for MainWindow.xaml
     /// </summary>
+
     public partial class MainWindow : Window
     {
         public MainWindow()
@@ -30,76 +31,103 @@ namespace InchesCalculator
         {
             string input = InputTextBox.Text;
 
-            // Використовуємо регулярний вираз для вилучення чисел та операторів зі введеного рядка
-            string pattern = @"(\d+\s*\'+\s*\d+(\s*\d*\/\d+)*)";
+            try
+            {
+                double resultInInches = EvaluateExpression(input);
+
+                // Конвертуємо результат з дюймів у фути та дюйми
+                int feet = (int)(resultInInches / 12);
+                double inches = resultInInches % 12;
+
+                // Виводимо результат
+                ResultFeetLabel.Text = $"{feet}' {inches}\"";
+                ResultInchesLabel.Text = $"{resultInInches:F4}\"";
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Помилка: {ex.Message}", "Помилка", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
+        private double EvaluateExpression(string input)
+        {
+            // Використовуємо регулярний вираз для вилучення чисел, операторів та вимірювань зі введеного рядка
+            string pattern = @"(\d+\s*'\s*\d+(\s*\d*\/\d+)*|\d+\s*\.\s*\d+|[\+\-\*\/])";
             MatchCollection matches = Regex.Matches(input, pattern);
 
             double resultInInches = 0;
+            string currentOperator = "+";
 
             foreach (Match match in matches)
             {
-                double value = ParseValue(match.Value);
-                string operatorSymbol = GetOperatorSymbol(match.Value);
+                string value = match.Value.Trim();
 
-                if (operatorSymbol == "+")
+                if (IsMeasurement(value))
                 {
-                    resultInInches += value;
+                    double measurementInInches = ConvertToInches(value);
+                    resultInInches = PerformOperation(resultInInches, measurementInInches, currentOperator);
                 }
-                else if (operatorSymbol == "-")
+                else
                 {
-                    resultInInches -= value;
-                }
-                else if (operatorSymbol == "*")
-                {
-                    resultInInches *= value;
-                }
-                else if (operatorSymbol == "/")
-                {
-                    resultInInches /= value;
+                    currentOperator = value;
                 }
             }
 
-            // Конвертуємо результат з дюймів у фути та дюйми
-            int feet = (int)(resultInInches / 12);
-            double inches = resultInInches % 12;
-
-            // Виводимо результат
-            ResultFeetLabel.Text = $"{feet}' {inches}\"";
-            ResultInchesLabel.Text = $"{resultInInches}\"";
+            return resultInInches;
         }
 
-        private double ParseValue(string input)
+        private bool IsMeasurement(string input)
         {
-            // Використовуємо регулярний вираз для вилучення числових значень зі строки
-            string pattern = @"(\d+)";
-            MatchCollection matches = Regex.Matches(input, pattern);
-
-            double value = 0;
-
-            foreach (Match match in matches)
-            {
-                if (match.Success)
-                {
-                    double number = double.Parse(match.Value);
-                    value += number;
-                }
-            }
-
-            return value;
+            // Перевіряємо, чи є введене значення вимірюванням (формат футів та дюймів)
+            string pattern = @"(\d+\s*'\s*\d+(\s*\d*\/\d+)*)";
+            return Regex.IsMatch(input, pattern);
         }
 
-        private string GetOperatorSymbol(string input)
+        private double ConvertToInches(string measurement)
         {
-            // Використовуємо регулярний вираз для вилучення операторів (+, -, *, /) зі строки
-            string pattern = @"([+\-*/])";
-            Match match = Regex.Match(input, pattern);
+            // Конвертуємо вимірювання з формату футів та дюймів в дюйми
+            string pattern = @"(\d+\s*'\s*\d+(\s*\d*\/\d+)*)";
+            Match match = Regex.Match(measurement, pattern);
 
             if (match.Success)
             {
-                return match.Value;
+                string[] parts = match.Value.Split('\'');
+                int feet = int.Parse(parts[0].Trim());
+                string[] inchesParts = parts[1].Trim().Split(' ');
+                int wholeInches = int.Parse(inchesParts[0].Trim());
+                double fractionalInches = 0;
+
+                if (inchesParts.Length > 1)
+                {
+                    string[] fractionParts = inchesParts[1].Split('/');
+                    int numerator = int.Parse(fractionParts[0].Trim());
+                    int denominator = int.Parse(fractionParts[1].Trim());
+                    fractionalInches = numerator / (double)denominator;
+                }
+
+                return feet * 12 + wholeInches + fractionalInches;
             }
 
-            return string.Empty;
+            throw new ArgumentException("Неправильний формат вимірювання.");
+        }
+
+        private double PerformOperation(double operand1, double operand2, string operatorSymbol)
+        {
+            // Виконуємо відповідну арифметичну операцію з двома операндами та оператором
+            switch (operatorSymbol)
+            {
+                case "+":
+                    return operand1 + operand2;
+                case "-":
+                    return operand1 - operand2;
+                case "*":
+                    return operand1 * operand2;
+                case "/":
+                    return operand1 / operand2;
+                default:
+                    throw new ArgumentException("Невідомий оператор.");
+            }
         }
     }
 }
+
